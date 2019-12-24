@@ -14,7 +14,7 @@ on:
   pull_request:
 
 env:
-  IMAGE_NAME: syscase-optee-base
+  IMAGE_NAME: optee-base
   IMAGE_ORGANIZATION: syscase
 
 jobs:
