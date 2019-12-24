@@ -15,7 +15,7 @@ on:
 
 env:
   IMAGE_NAME: syscase-optee-base
-  ORGANIZATION: syscase
+  IMAGE_ORGANIZATION: syscase
 
 jobs:
   # Run tests.
@@ -55,7 +55,7 @@ jobs:
 
       - name: Push image
         run: |
-          IMAGE_ID=$IMAGE_ORGANISATION/$IMAGE_NAME
+          IMAGE_ID=$IMAGE_ORGANIZATION/$IMAGE_NAME
 
           # Strip git ref prefix from version
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
