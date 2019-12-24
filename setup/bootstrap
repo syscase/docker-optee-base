@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+root=$(dirname "$(readlink -f "$0")")
+
+source "$root/strict-mode.sh"
+
+echo "[multilib]" >> /etc/pacman.conf
+echo "Include = /etc/pacman.d/mirrorlist" >> /etc/pacman.conf
+echo '[archlinuxfr]' >> /etc/pacman.conf
+echo 'SigLevel = Never' >> /etc/pacman.conf
+echo 'Server = http://repo.archlinux.fr/$arch' >> /etc/pacman.conf
+
+pacman -Syy --noconfirm
+# Install dependency for pacman-key --init
+pacman --noconfirm --asdeps -S gawk
+pacman-key --init && pacman-key --populate archlinux
+pacman -Syyuu --noconfirm
+
+pacman        \
+  -Syu        \
+  --noconfirm \
+  --needed    \
+  base-devel  \
+  curl        \
+  wget        \
+  python2     \
+  git         \
+  unzip       \
+  p7zip       \
+  sudo        \
+  zsh         \
+  vim         \
+  gnupg       \
+  git         \
+  openssh     \
+  repo        \
+  ccache      \
+  gnu-netcat  \
+  screen
+
+pacman -Scc --noconfirm
+
+useradd -m syscase
+echo "syscase ALL=NOPASSWD: ALL" > /etc/sudoers.d/syscase
+
+su syscase <<'EOF'
+\curl -sSL https://rvm.io/mpapis.asc | sudo gpg2 --import -
+\curl -sSL https://rvm.io/pkuczynski.asc | sudo gpg2 --import -
+# ncurses5-compat-libs
+for server in $(shuf -e ha.pool.sks-keyservers.net \
+                        hkp://p80.pool.sks-keyservers.net:80 \
+                        keyserver.ubuntu.com \
+                        hkp://keyserver.ubuntu.com:80 \
+                        pgp.mit.edu) ; do
+  if gpg --keyserver "$server" --recv-keys "702353E0F7E48EDB" ; then
+    break
+  fi
+done
+
+cd ~
+git clone https://aur.archlinux.org/yay.git
+cd yay
+makepkg -si --noconfirm
+cd ..
+rm -rf yay
+
+yay -S --noconfirm rcm oh-my-zsh-git op-tee-tools
+\curl -sSL https://get.rvm.io | sudo bash -s stable
+EOF
+
+pacman -Scc --noconfirm
+
+if [ "$PYTHON_ALIAS" == "y" ]; then
+  bin_python=$(cat <<-'EOF'
+#!/bin/bash
+script=$(readlink -f -- "$1")
+case "$script" in (/home/syscase/*)
+    exec python2 "$@"
+    ;;
+esac
+exec python3 "$@"
+EOF
+)
+  mkdir /home/syscase/.bin
+  echo "$bin_python" > /home/syscase/.bin/python
+  chown -R syscase:syscase /home/syscase/.bin
+  chmod 755 /home/syscase/.bin/python
+else
+  ln -s /usr/bin/python2 /usr/bin/python
+fi
+
+usermod -a -G rvm syscase
+
+su syscase <<'EOF'
+/usr/local/rvm/bin/rvm install ruby-2.5.0
+
+cd ~
+git clone https://github.com/zaidan/dotfiles.git
+git clone https://github.com/zaidan/dotfiles-local
+# Set some defaults for repo command
+echo '[user]' > ~/dotfiles-local/gitconfig.local
+echo 'name=Syscase' >> ~/dotfiles-local/gitconfig.local
+echo 'email=syscase@invalid.tld' >> ~/dotfiles-local/gitconfig.local
+
+yes 'y' | env RCRC=$HOME/dotfiles/rcrc /usr/bin/rcup
+echo 'shell "/usr/bin/zsh"' > ~/.screenrc
+git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
+yes '' | vim +PluginInstall +qall
+mkdir ~/.ssh
+chmod 700 ~/.ssh
+EOF
+
+chsh -s /usr/bin/zsh syscase
